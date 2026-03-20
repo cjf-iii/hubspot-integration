@@ -1,0 +1,1008 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CIM HubSpot Enrichment — Before & After</title>
+
+  <!-- Google Fonts: Bricolage Grotesque for body, Fragment Mono for labels/code -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,300;12..96,400;12..96,500;12..96,600;12..96,700&family=Fragment+Mono&display=swap" rel="stylesheet" />
+
+  <style>
+    /* ─────────────────────────────────────────────────────────
+       CSS CUSTOM PROPERTIES — CIM Brand Token System
+       Each token maps to a specific role in the design.
+    ───────────────────────────────────────────────────────── */
+    :root {
+      --color-bg:          #181a2e;   /* Page background — deep navy */
+      --color-surface:     #212340;   /* Card/panel surfaces */
+      --color-surface-alt: #1c1e38;   /* Slightly darker surface variant */
+      --color-border:      #2e3158;   /* Subtle borders */
+      --color-accent:      #e85d75;   /* Coral/rose — primary accent */
+      --color-amber:       #d4a73a;   /* Amber — secondary accent / warnings */
+      --color-green:       #4ade80;   /* Success / "after" state */
+      --color-text:        #f0ecf0;   /* Primary text */
+      --color-dim:         #8a8a9e;   /* Dimmed / secondary text */
+      --color-tag-bg:      #2a2c50;   /* Background for inline tags */
+
+      --font-body:  'Bricolage Grotesque', sans-serif;
+      --font-mono:  'Fragment Mono', monospace;
+
+      --radius-sm: 6px;
+      --radius-md: 12px;
+      --radius-lg: 18px;
+
+      /* Animation timing constants — controls stagger for "fill in" effect */
+      --anim-base-delay: 1200ms;   /* Pause before enrichment begins */
+      --anim-step:        180ms;   /* Gap between each property appearing */
+    }
+
+    /* ─────────────────────────────────────────────────────────
+       BASE RESET & GLOBAL
+    ───────────────────────────────────────────────────────── */
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html, body {
+      min-height: 100vh;
+      background: var(--color-bg);
+      color: var(--color-text);
+      font-family: var(--font-body);
+      font-size: 15px;
+      line-height: 1.55;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ─────────────────────────────────────────────────────────
+       PAGE WRAPPER — max-width centered layout
+    ───────────────────────────────────────────────────────── */
+    .page-wrapper {
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 40px 32px 60px;
+      display: flex;
+      flex-direction: column;
+      gap: 48px;
+    }
+
+    /* ─────────────────────────────────────────────────────────
+       PAGE HEADER
+    ───────────────────────────────────────────────────────── */
+    .page-header {
+      text-align: center;
+    }
+
+    .page-header__eyebrow {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--color-accent);
+      margin-bottom: 10px;
+    }
+
+    .page-header__title {
+      font-size: clamp(26px, 4vw, 40px);
+      font-weight: 700;
+      color: var(--color-text);
+      letter-spacing: -0.02em;
+      line-height: 1.15;
+    }
+
+    .page-header__subtitle {
+      margin-top: 10px;
+      font-size: 15px;
+      color: var(--color-dim);
+      font-weight: 400;
+    }
+
+    /* ─────────────────────────────────────────────────────────
+       SPLIT-SCREEN CONTAINER
+       Two equal-width panels side by side. On narrow screens
+       they stack vertically.
+    ───────────────────────────────────────────────────────── */
+    .split-screen {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+      align-items: start;
+    }
+
+    @media (max-width: 840px) {
+      .split-screen {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* ─────────────────────────────────────────────────────────
+       PANEL — shared card shell for both BEFORE and AFTER
+    ───────────────────────────────────────────────────────── */
+    .panel {
+      background: var(--color-surface);
+      border-radius: var(--radius-lg);
+      border: 1px solid var(--color-border);
+      overflow: hidden;
+      /* Subtle box shadow to lift cards off the background */
+      box-shadow: 0 4px 32px rgba(0, 0, 0, 0.4), 0 1px 0 rgba(255,255,255,0.04) inset;
+    }
+
+    /* Panel header bar — colored band with label + badge */
+    .panel__header {
+      padding: 16px 22px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      border-bottom: 1px solid var(--color-border);
+    }
+
+    .panel--before .panel__header {
+      background: linear-gradient(90deg, rgba(232,93,117,0.12) 0%, transparent 100%);
+    }
+
+    .panel--after .panel__header {
+      background: linear-gradient(90deg, rgba(74,222,128,0.12) 0%, transparent 100%);
+    }
+
+    .panel__label {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      font-weight: 600;
+    }
+
+    .panel--before .panel__label { color: var(--color-accent); }
+    .panel--after  .panel__label { color: var(--color-green); }
+
+    /* Dot indicator: red for BEFORE, green for AFTER */
+    .panel__dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .panel--before .panel__dot { background: var(--color-accent); }
+    .panel--after  .panel__dot {
+      background: var(--color-green);
+      /* Pulse animation to draw the eye — fires once on load after delay */
+      animation: pulse-dot 0.6s ease-out calc(var(--anim-base-delay) + 2400ms) both;
+    }
+
+    @keyframes pulse-dot {
+      0%   { box-shadow: 0 0 0 0 rgba(74, 222, 128, 0.7); }
+      70%  { box-shadow: 0 0 0 8px rgba(74, 222, 128, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(74, 222, 128, 0); }
+    }
+
+    /* ─────────────────────────────────────────────────────────
+       RECORD BODY — scrollable area inside each panel
+    ───────────────────────────────────────────────────────── */
+    .record {
+      padding: 20px 22px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    /* Company name row at the top of every record */
+    .record__company-name {
+      font-size: 22px;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+      color: var(--color-text);
+    }
+
+    /* ─────────────────────────────────────────────────────────
+       SECTION — labeled group within a record
+    ───────────────────────────────────────────────────────── */
+    .section {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .section__title {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--color-dim);
+      padding-bottom: 6px;
+      border-bottom: 1px solid var(--color-border);
+      margin-bottom: 2px;
+    }
+
+    /* ─────────────────────────────────────────────────────────
+       PROPERTY ROW — key : value pair
+    ───────────────────────────────────────────────────────── */
+    .prop {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 12px;
+      min-height: 22px;
+    }
+
+    .prop__key {
+      font-size: 12px;
+      color: var(--color-dim);
+      font-family: var(--font-mono);
+      flex-shrink: 0;
+      white-space: nowrap;
+    }
+
+    .prop__val {
+      font-size: 13px;
+      color: var(--color-text);
+      font-weight: 500;
+      text-align: right;
+    }
+
+    /* Empty state — dashed placeholder shown in BEFORE panel */
+    .prop__val--empty {
+      color: var(--color-border);
+      font-style: italic;
+      font-weight: 400;
+      font-size: 12px;
+    }
+
+    /* Tier badge — colored pill */
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 2px 10px;
+      border-radius: 99px;
+      font-size: 12px;
+      font-weight: 600;
+      font-family: var(--font-mono);
+      letter-spacing: 0.04em;
+    }
+
+    .badge--tier {
+      background: rgba(212, 167, 58, 0.18);
+      color: var(--color-amber);
+      border: 1px solid rgba(212, 167, 58, 0.35);
+    }
+
+    .badge--priority-high {
+      background: rgba(232, 93, 117, 0.15);
+      color: var(--color-accent);
+      border: 1px solid rgba(232, 93, 117, 0.3);
+    }
+
+    .badge--status {
+      background: rgba(138, 138, 158, 0.15);
+      color: var(--color-dim);
+      border: 1px solid rgba(138, 138, 158, 0.25);
+    }
+
+    /* Score bar — visual 0–10 bar for sports alignment */
+    .score-bar-wrap {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .score-bar {
+      flex: 1;
+      height: 5px;
+      background: var(--color-border);
+      border-radius: 99px;
+      overflow: hidden;
+    }
+
+    .score-bar__fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--color-amber), var(--color-accent));
+      border-radius: 99px;
+      /* Width is set inline per item */
+      transform-origin: left;
+    }
+
+    .score-bar__fill--animated {
+      /* Scale from 0 to full width during the enrichment animation */
+      transform: scaleX(0);
+      animation: bar-grow 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+    }
+
+    @keyframes bar-grow {
+      to { transform: scaleX(1); }
+    }
+
+    /* DMA tag list */
+    .tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .tag {
+      background: var(--color-tag-bg);
+      color: var(--color-dim);
+      font-size: 11px;
+      font-family: var(--font-mono);
+      padding: 3px 9px;
+      border-radius: 4px;
+      border: 1px solid var(--color-border);
+      white-space: nowrap;
+    }
+
+    /* ─────────────────────────────────────────────────────────
+       CONTACT CARD — person entry in Contacts section
+    ───────────────────────────────────────────────────────── */
+    .contact-card {
+      background: var(--color-surface-alt);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-sm);
+      padding: 10px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .contact-card__name {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--color-text);
+    }
+
+    .contact-card__role {
+      font-size: 11px;
+      color: var(--color-dim);
+    }
+
+    .contact-card__email {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--color-accent);
+    }
+
+    /* ─────────────────────────────────────────────────────────
+       AI BRIEF BLOCK
+    ───────────────────────────────────────────────────────── */
+    .ai-brief {
+      background: var(--color-surface-alt);
+      border: 1px solid rgba(212, 167, 58, 0.25);
+      border-left: 3px solid var(--color-amber);
+      border-radius: var(--radius-sm);
+      padding: 12px 14px;
+    }
+
+    .ai-brief__label {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--color-amber);
+      margin-bottom: 6px;
+    }
+
+    .ai-brief__text {
+      font-size: 13px;
+      color: var(--color-dim);
+      line-height: 1.65;
+    }
+
+    .ai-brief__text em {
+      font-style: italic;
+    }
+
+    /* ─────────────────────────────────────────────────────────
+       TASK CARD
+    ───────────────────────────────────────────────────────── */
+    .task-card {
+      background: var(--color-surface-alt);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-sm);
+      padding: 10px 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .task-card__title {
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--color-text);
+    }
+
+    .task-card__badges {
+      display: flex;
+      gap: 6px;
+      flex-shrink: 0;
+    }
+
+    /* ─────────────────────────────────────────────────────────
+       BEFORE PANEL — empty placeholder styles
+    ───────────────────────────────────────────────────────── */
+
+    /* Skeleton shimmer — used for empty fields in the BEFORE panel */
+    .skeleton {
+      display: inline-block;
+      height: 12px;
+      border-radius: 4px;
+      background: linear-gradient(
+        90deg,
+        var(--color-border) 0%,
+        rgba(74, 78, 120, 0.5) 50%,
+        var(--color-border) 100%
+      );
+      background-size: 200% 100%;
+      animation: shimmer 1.8s ease-in-out infinite;
+    }
+
+    @keyframes shimmer {
+      0%   { background-position: 200% 0; }
+      100% { background-position: -200% 0; }
+    }
+
+    .skeleton--sm  { width: 60px; }
+    .skeleton--md  { width: 100px; }
+    .skeleton--lg  { width: 140px; }
+    .skeleton--xl  { width: 180px; }
+    .skeleton--full { width: 100%; }
+
+    .skeleton-block {
+      height: 72px;
+      border-radius: var(--radius-sm);
+      background: linear-gradient(
+        90deg,
+        var(--color-border) 0%,
+        rgba(74, 78, 120, 0.5) 50%,
+        var(--color-border) 100%
+      );
+      background-size: 200% 100%;
+      animation: shimmer 1.8s ease-in-out infinite;
+    }
+
+    /* ─────────────────────────────────────────────────────────
+       AFTER PANEL — enriched field animation
+       Each enriched property fades + slides up from zero.
+       The nth-child delays are assigned via CSS custom props
+       set inline on each .anim-item element.
+    ───────────────────────────────────────────────────────── */
+    .anim-item {
+      /* Start invisible and slightly below */
+      opacity: 0;
+      transform: translateY(6px);
+      /*
+        animation-delay combines the global base delay with each item's
+        individual offset (--i * --anim-step), set inline as style="--i:N"
+      */
+      animation: fade-up 0.35s ease-out
+        calc(var(--anim-base-delay) + calc(var(--i, 0) * var(--anim-step)))
+        both;
+    }
+
+    @keyframes fade-up {
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    /* ─────────────────────────────────────────────────────────
+       PIPELINE FLOW DIAGRAM
+    ───────────────────────────────────────────────────────── */
+    .pipeline-section {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .pipeline-section__title {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: var(--color-dim);
+      text-align: center;
+    }
+
+    .pipeline {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 0;
+    }
+
+    /* Each pipeline step block */
+    .pipeline-step {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      min-width: 140px;
+      flex: 1;
+      max-width: 200px;
+    }
+
+    .pipeline-step__box {
+      background: var(--color-surface);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
+      padding: 14px 16px;
+      width: 100%;
+      text-align: center;
+      position: relative;
+      /* Each box fades in sequentially to simulate the pipeline running */
+      opacity: 0;
+      animation: fade-up 0.4s ease-out both;
+    }
+
+    /* Individual animation delays for each pipeline step */
+    .pipeline-step:nth-child(1)  .pipeline-step__box { animation-delay: 0.2s; }
+    .pipeline-step:nth-child(3)  .pipeline-step__box { animation-delay: 0.5s; }
+    .pipeline-step:nth-child(5)  .pipeline-step__box { animation-delay: 0.8s; }
+    .pipeline-step:nth-child(7)  .pipeline-step__box { animation-delay: 1.1s; }
+    .pipeline-step:nth-child(9)  .pipeline-step__box { animation-delay: 1.4s; }
+
+    /* Accent the active/processing step */
+    .pipeline-step--active .pipeline-step__box {
+      border-color: var(--color-accent);
+      background: rgba(232, 93, 117, 0.07);
+    }
+
+    .pipeline-step--done .pipeline-step__box {
+      border-color: rgba(74, 222, 128, 0.4);
+    }
+
+    .pipeline-step__icon {
+      font-size: 22px;
+      line-height: 1;
+      /* Inline SVG-based icons rendered via text/emoji for zero-dependency */
+    }
+
+    .pipeline-step__name {
+      font-weight: 600;
+      font-size: 13px;
+      color: var(--color-text);
+    }
+
+    .pipeline-step__time {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--color-dim);
+    }
+
+    /* Arrow connector between steps */
+    .pipeline-arrow {
+      color: var(--color-border);
+      font-size: 18px;
+      padding: 0 4px;
+      flex-shrink: 0;
+      align-self: center;
+      margin-top: -22px; /* optical centering with the box */
+      opacity: 0;
+      animation: fade-up 0.3s ease-out both;
+    }
+
+    /* Arrow fade-in delays (between steps) */
+    .pipeline-arrow:nth-of-type(2) { animation-delay: 0.35s; }
+    .pipeline-arrow:nth-of-type(4) { animation-delay: 0.65s; }
+    .pipeline-arrow:nth-of-type(6) { animation-delay: 0.95s; }
+    .pipeline-arrow:nth-of-type(8) { animation-delay: 1.25s; }
+
+    @media (max-width: 700px) {
+      .pipeline { flex-direction: column; gap: 4px; }
+      .pipeline-arrow { transform: rotate(90deg); margin: 0; }
+      .pipeline-step { max-width: 100%; width: 100%; }
+    }
+
+    /* ─────────────────────────────────────────────────────────
+       PAGE FOOTER
+    ───────────────────────────────────────────────────────── */
+    .page-footer {
+      text-align: center;
+      border-top: 1px solid var(--color-border);
+      padding-top: 24px;
+    }
+
+    .page-footer__logo {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--color-text);
+      letter-spacing: 0.04em;
+    }
+
+    .page-footer__tagline {
+      font-size: 12px;
+      color: var(--color-dim);
+      margin-top: 4px;
+      font-family: var(--font-mono);
+    }
+
+    .page-footer__sep {
+      color: var(--color-border);
+      margin: 0 6px;
+    }
+
+    /* ─────────────────────────────────────────────────────────
+       DIVIDER — center arrow between panels (decorative)
+    ───────────────────────────────────────────────────────── */
+    .split-divider {
+      display: none; /* hidden on wide; shown only when panels stack */
+    }
+
+    @media (max-width: 840px) {
+      .split-divider {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        color: var(--color-dim);
+        font-family: var(--font-mono);
+        font-size: 11px;
+        letter-spacing: 0.1em;
+      }
+      .split-divider__arrow {
+        font-size: 24px;
+        color: var(--color-accent);
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="page-wrapper">
+
+    <!-- ═══════════════════════════════════════
+         PAGE HEADER
+    ═══════════════════════════════════════ -->
+    <header class="page-header">
+      <p class="page-header__eyebrow">Cast Iron Media · The Foundry</p>
+      <h1 class="page-header__title">CIM HubSpot Enrichment — Before &amp; After</h1>
+      <p class="page-header__subtitle">
+        Automated enrichment pipeline: Apollo.io data + Claude AI briefing + HubSpot writeback
+      </p>
+    </header>
+
+    <!-- ═══════════════════════════════════════
+         SPLIT-SCREEN: BEFORE | AFTER
+    ═══════════════════════════════════════ -->
+    <div class="split-screen">
+
+      <!-- ─────────────────── BEFORE PANEL ─────────────────── -->
+      <div class="panel panel--before" aria-label="Before enrichment — empty record">
+        <div class="panel__header">
+          <span class="panel__dot"></span>
+          <span class="panel__label">Before Enrichment</span>
+        </div>
+
+        <div class="record">
+          <!-- Company name is always known — it's the seed input -->
+          <div class="record__company-name">Culver's</div>
+
+          <!-- CIM Properties section — all empty/skeleton -->
+          <div class="section">
+            <div class="section__title">CIM Properties</div>
+
+            <div class="prop">
+              <span class="prop__key">cim_tier</span>
+              <span class="prop__val prop__val--empty">—</span>
+            </div>
+            <div class="prop">
+              <span class="prop__key">cim_vertical</span>
+              <span class="skeleton skeleton--xl"></span>
+            </div>
+            <div class="prop">
+              <span class="prop__key">est_ad_spend</span>
+              <span class="prop__val prop__val--empty">—</span>
+            </div>
+            <div class="prop">
+              <span class="prop__key">sports_alignment</span>
+              <span class="skeleton skeleton--sm"></span>
+            </div>
+            <div class="prop">
+              <span class="prop__key">dma_markets</span>
+              <span class="skeleton skeleton--lg"></span>
+            </div>
+          </div>
+
+          <!-- Company Info section — all empty -->
+          <div class="section">
+            <div class="section__title">Company Info</div>
+
+            <div class="prop">
+              <span class="prop__key">industry</span>
+              <span class="skeleton skeleton--md"></span>
+            </div>
+            <div class="prop">
+              <span class="prop__key">num_employees</span>
+              <span class="prop__val prop__val--empty">—</span>
+            </div>
+            <div class="prop">
+              <span class="prop__key">city / state</span>
+              <span class="skeleton skeleton--lg"></span>
+            </div>
+          </div>
+
+          <!-- Contacts — placeholder block -->
+          <div class="section">
+            <div class="section__title">Contacts</div>
+            <div class="skeleton-block"></div>
+          </div>
+
+          <!-- AI Brief — placeholder block -->
+          <div class="section">
+            <div class="section__title">AI Brief</div>
+            <div class="skeleton-block" style="height: 56px;"></div>
+          </div>
+
+          <!-- Tasks — empty -->
+          <div class="section">
+            <div class="section__title">Tasks</div>
+            <div class="prop">
+              <span class="prop__key">review_task</span>
+              <span class="prop__val prop__val--empty">none created</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- END BEFORE PANEL -->
+
+      <!-- Mobile-only divider between stacked panels -->
+      <div class="split-divider" aria-hidden="true">
+        <span class="split-divider__arrow">↓</span>
+        <span>Enrichment Complete</span>
+        <span class="split-divider__arrow">↓</span>
+      </div>
+
+      <!-- ─────────────────── AFTER PANEL ─────────────────── -->
+      <!--
+        Each .anim-item receives --i:<index> as an inline style.
+        The CSS animation-delay formula:
+          delay = var(--anim-base-delay) + (--i * --anim-step)
+        This creates a stagger effect where properties appear sequentially,
+        simulating the pipeline writing fields one by one.
+      -->
+      <div class="panel panel--after" aria-label="After enrichment — fully populated record">
+        <div class="panel__header">
+          <span class="panel__dot"></span>
+          <span class="panel__label">After Enrichment</span>
+        </div>
+
+        <div class="record">
+          <!-- Company name — same seed, now confirms data was found -->
+          <div class="record__company-name anim-item" style="--i:0">Culver's</div>
+
+          <!-- CIM Properties — all filled in -->
+          <div class="section anim-item" style="--i:1">
+            <div class="section__title">CIM Properties</div>
+
+            <!-- Tier: amber badge -->
+            <div class="prop anim-item" style="--i:2">
+              <span class="prop__key">cim_tier</span>
+              <span class="prop__val">
+                <span class="badge badge--tier">Tier 2</span>
+              </span>
+            </div>
+
+            <!-- Vertical -->
+            <div class="prop anim-item" style="--i:3">
+              <span class="prop__key">cim_vertical</span>
+              <span class="prop__val">QSR &amp; Fast-Casual Restaurants</span>
+            </div>
+
+            <!-- Estimated ad spend -->
+            <div class="prop anim-item" style="--i:4">
+              <span class="prop__key">est_ad_spend</span>
+              <span class="prop__val" style="color: var(--color-green);">$65,000,000</span>
+            </div>
+
+            <!-- Sports alignment — score bar -->
+            <div class="prop anim-item" style="--i:5">
+              <span class="prop__key">sports_alignment</span>
+              <span class="prop__val">
+                <span class="score-bar-wrap">
+                  <span class="score-bar">
+                    <!--
+                      Width set to 80% = 8/10 score.
+                      animation-delay matches the parent .anim-item so the bar
+                      grows at the same time the row becomes visible.
+                    -->
+                    <span
+                      class="score-bar__fill score-bar__fill--animated"
+                      style="
+                        width: 80%;
+                        animation-delay: calc(var(--anim-base-delay) + calc(5 * var(--anim-step)) + 0.15s);
+                      "
+                    ></span>
+                  </span>
+                  <span style="font-size:12px; font-family: var(--font-mono); color: var(--color-amber);">8/10</span>
+                </span>
+              </span>
+            </div>
+
+            <!-- DMA Markets — tag list -->
+            <div class="prop anim-item" style="--i:6; flex-direction: column; align-items: flex-start; gap: 8px;">
+              <span class="prop__key">dma_markets</span>
+              <div class="tags">
+                <span class="tag">Detroit</span>
+                <span class="tag">Cleveland</span>
+                <span class="tag">Tampa</span>
+                <span class="tag">Minneapolis</span>
+                <span class="tag">St. Louis</span>
+                <span class="tag">Milwaukee</span>
+                <span class="tag">Kansas City</span>
+                <span class="tag">Cincinnati</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Company Info section -->
+          <div class="section">
+            <div class="section__title anim-item" style="--i:7">Company Info</div>
+
+            <div class="prop anim-item" style="--i:8">
+              <span class="prop__key">industry</span>
+              <span class="prop__val">Restaurants</span>
+            </div>
+            <div class="prop anim-item" style="--i:9">
+              <span class="prop__key">num_employees</span>
+              <span class="prop__val">~400</span>
+            </div>
+            <div class="prop anim-item" style="--i:10">
+              <span class="prop__key">city / state</span>
+              <span class="prop__val">Prairie du Sac, WI</span>
+            </div>
+          </div>
+
+          <!-- Contacts section -->
+          <div class="section">
+            <div class="section__title anim-item" style="--i:11">Contacts</div>
+
+            <div class="anim-item" style="--i:12">
+              <div class="contact-card">
+                <span class="contact-card__name">Jane Smith</span>
+                <span class="contact-card__role">VP Marketing</span>
+                <span class="contact-card__email">jane.smith@culvers.com</span>
+              </div>
+            </div>
+
+            <div class="anim-item" style="--i:13">
+              <div class="contact-card">
+                <span class="contact-card__name">Michael Chen</span>
+                <span class="contact-card__role">Media Director</span>
+                <span class="contact-card__email">michael.chen@culvers.com</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- AI Brief section -->
+          <div class="section">
+            <div class="section__title anim-item" style="--i:14">AI Brief</div>
+
+            <div class="anim-item" style="--i:15">
+              <div class="ai-brief">
+                <div class="ai-brief__label">Claude AI — Generated Brief</div>
+                <p class="ai-brief__text">
+                  <em>"Culver's is a Midwest-dominant QSR chain with $65M in annual advertising,
+                  heavily weighted toward broadcast and local spot buys. They're active in 8 CIM
+                  markets, all of which have teams in RSN transition — making them a strong
+                  candidate for CTV/streaming outreach. Sports alignment is high (8/10) with
+                  regional NFL and MLB affinity. Recommend prioritizing Detroit and Minneapolis
+                  for Q3 outreach..."</em>
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Tasks section -->
+          <div class="section">
+            <div class="section__title anim-item" style="--i:16">Tasks</div>
+
+            <div class="anim-item" style="--i:17">
+              <div class="task-card">
+                <span class="task-card__title">Review AI Brief — Culver's</span>
+                <div class="task-card__badges">
+                  <span class="badge badge--status">NOT_STARTED</span>
+                  <span class="badge badge--priority-high">HIGH</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+      <!-- END AFTER PANEL -->
+
+    </div>
+    <!-- END SPLIT-SCREEN -->
+
+    <!-- ═══════════════════════════════════════
+         PIPELINE FLOW DIAGRAM
+         Shows the enrichment pipeline as a
+         horizontal chain of labeled steps with
+         estimated durations. Steps and arrows
+         fade in sequentially on load.
+    ═══════════════════════════════════════ -->
+    <div class="pipeline-section">
+      <p class="pipeline-section__title">Enrichment Pipeline</p>
+
+      <div class="pipeline" role="img" aria-label="Enrichment pipeline: Company Name → Apollo.io → Claude AI → HubSpot Writeback → Enriched Record">
+
+        <!-- Step 1: Input -->
+        <div class="pipeline-step pipeline-step--done">
+          <div class="pipeline-step__box">
+            <div class="pipeline-step__icon">🏢</div>
+            <div class="pipeline-step__name">Company Name</div>
+            <div class="pipeline-step__time">Input seed</div>
+          </div>
+        </div>
+
+        <!-- Arrow 1→2 -->
+        <div class="pipeline-arrow" aria-hidden="true">→</div>
+
+        <!-- Step 2: Apollo.io -->
+        <div class="pipeline-step pipeline-step--done">
+          <div class="pipeline-step__box">
+            <div class="pipeline-step__icon">🔍</div>
+            <div class="pipeline-step__name">Apollo.io</div>
+            <div class="pipeline-step__time">~2s · Enrichment</div>
+          </div>
+        </div>
+
+        <!-- Arrow 2→3 -->
+        <div class="pipeline-arrow" aria-hidden="true">→</div>
+
+        <!-- Step 3: Claude AI -->
+        <div class="pipeline-step pipeline-step--done">
+          <div class="pipeline-step__box">
+            <div class="pipeline-step__icon">🤖</div>
+            <div class="pipeline-step__name">Claude AI Brief</div>
+            <div class="pipeline-step__time">~3s · LLM generate</div>
+          </div>
+        </div>
+
+        <!-- Arrow 3→4 -->
+        <div class="pipeline-arrow" aria-hidden="true">→</div>
+
+        <!-- Step 4: HubSpot write -->
+        <div class="pipeline-step pipeline-step--done">
+          <div class="pipeline-step__box">
+            <div class="pipeline-step__icon">📤</div>
+            <div class="pipeline-step__name">HubSpot Writeback</div>
+            <div class="pipeline-step__time">~5s · API write</div>
+          </div>
+        </div>
+
+        <!-- Arrow 4→5 -->
+        <div class="pipeline-arrow" aria-hidden="true">→</div>
+
+        <!-- Step 5: Result -->
+        <div class="pipeline-step pipeline-step--done">
+          <div class="pipeline-step__box" style="border-color: rgba(74,222,128,0.5); background: rgba(74,222,128,0.06);">
+            <div class="pipeline-step__icon">✅</div>
+            <div class="pipeline-step__name">Enriched Record</div>
+            <div class="pipeline-step__time">~2s · Confirmed</div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+    <!-- END PIPELINE SECTION -->
+
+    <!-- ═══════════════════════════════════════
+         PAGE FOOTER
+    ═══════════════════════════════════════ -->
+    <footer class="page-footer">
+      <div class="page-footer__logo">Cast Iron Media</div>
+      <div class="page-footer__tagline">
+        The Foundry
+        <span class="page-footer__sep">·</span>
+        Sports-Specific CTV Ad Tech
+      </div>
+    </footer>
+
+  </div><!-- END .page-wrapper -->
+</body>
+</html>
