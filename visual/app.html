@@ -168,7 +168,7 @@
 
 <div class="app">
   <header class="header">
-    <div class="header__badge">Live Enrichment Engine</div>
+    <div class="header__badge" id="modeBadge">Enrichment Engine</div>
     <h1 class="header__title">Prospect Intelligence</h1>
     <p class="header__sub">Type a company name. Get a full dossier in 10 seconds.<br/>Apollo.io data, AI-generated brief, written to HubSpot.</p>
   </header>
@@ -377,6 +377,27 @@ function showResult(data) {
 document.getElementById('companyInput').addEventListener('keydown', function(e) {
   if (e.key === 'Enter') startEnrichment();
 });
+
+/* Check operating mode on load and update the badge accordingly */
+fetch('/api/mode')
+  .then(function(r) { return r.json(); })
+  .then(function(data) {
+    var badge = document.getElementById('modeBadge');
+    if (data.mode === 'demo') {
+      badge.textContent = 'Demo Mode — No API Keys Required';
+      badge.style.color = 'var(--amber)';
+      badge.style.borderColor = 'rgba(251,191,36,.15)';
+      badge.style.background = 'rgba(251,191,36,.08)';
+    } else {
+      badge.textContent = 'Live — Connected to APIs';
+      badge.style.color = 'var(--green)';
+      badge.style.borderColor = 'rgba(52,211,153,.15)';
+      badge.style.background = 'rgba(52,211,153,.08)';
+    }
+  })
+  .catch(function() {
+    /* If /api/mode fails, we're probably running as a static file — that's fine */
+  });
 </script>
 
 </body>
