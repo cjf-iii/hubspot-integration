@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CIM Prospect Enrichment</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Fragment+Mono:wght@400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0c16;
+    --surface: #12152a;
+    --surface2: #1a1e38;
+    --surface3: #222748;
+    --border: rgba(232,93,117,.06);
+    --border-active: rgba(232,93,117,.25);
+    --text: #e4e2ec;
+    --text-dim: #6e6e88;
+    --text-muted: #44445a;
+    --accent: #e85d75;
+    --accent-glow: rgba(232,93,117,.15);
+    --green: #34d399;
+    --green-glow: rgba(52,211,153,.12);
+    --amber: #fbbf24;
+    --blue: #60a5fa;
+    --font: 'Space Grotesk', system-ui, sans-serif;
+    --mono: 'Fragment Mono', 'SF Mono', monospace;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: var(--font);
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    top: -40%; left: -20%;
+    width: 140%; height: 140%;
+    background:
+      radial-gradient(ellipse at 20% 50%, rgba(232,93,117,.04) 0%, transparent 50%),
+      radial-gradient(ellipse at 80% 20%, rgba(96,165,250,.03) 0%, transparent 50%),
+      radial-gradient(ellipse at 50% 90%, rgba(52,211,153,.02) 0%, transparent 40%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .app { position: relative; z-index: 1; max-width: 960px; margin: 0 auto; padding: 0 24px; }
+
+  .header { padding: 48px 0 0; text-align: center; }
+  .header__badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-family: var(--mono); font-size: 10px; letter-spacing: 2px; text-transform: uppercase;
+    color: var(--accent); background: var(--accent-glow);
+    border: 1px solid rgba(232,93,117,.12); border-radius: 20px; padding: 5px 14px; margin-bottom: 20px;
+  }
+  .header__badge::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); animation: pulse 2s ease-in-out infinite; }
+  @keyframes pulse { 0%,100% { opacity: .4; } 50% { opacity: 1; } }
+  .header__title { font-size: clamp(28px, 5vw, 44px); font-weight: 700; letter-spacing: -1.5px; line-height: 1.1; margin-bottom: 8px; }
+  .header__sub { font-size: 15px; color: var(--text-dim); max-width: 480px; margin: 0 auto; line-height: 1.5; }
+
+  .input-section { margin-top: 40px; display: flex; flex-direction: column; align-items: center; }
+  .input-wrap { position: relative; width: 100%; max-width: 560px; }
+  .input-field {
+    width: 100%; font-family: var(--font); font-size: 18px; font-weight: 500;
+    color: var(--text); background: var(--surface); border: 1px solid var(--border);
+    border-radius: 14px; padding: 18px 140px 18px 22px; outline: none;
+    transition: border-color .25s, box-shadow .25s;
+  }
+  .input-field::placeholder { color: var(--text-muted); }
+  .input-field:focus { border-color: var(--border-active); box-shadow: 0 0 0 4px var(--accent-glow), 0 8px 32px rgba(0,0,0,.3); }
+  .input-btn {
+    position: absolute; right: 6px; top: 50%; transform: translateY(-50%);
+    font-family: var(--mono); font-size: 12px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase;
+    color: var(--bg); background: var(--accent); border: none; border-radius: 10px; padding: 12px 20px;
+    cursor: pointer; transition: transform .15s, box-shadow .15s, opacity .15s;
+  }
+  .input-btn:hover { transform: translateY(-50%) scale(1.03); box-shadow: 0 4px 20px var(--accent-glow); }
+  .input-btn:active { transform: translateY(-50%) scale(.97); }
+  .input-btn:disabled { opacity: .4; cursor: not-allowed; transform: translateY(-50%); }
+  .input-hint { font-family: var(--mono); font-size: 11px; color: var(--text-muted); margin-top: 10px; letter-spacing: .5px; }
+
+  .pipeline { margin-top: 40px; width: 100%; max-width: 560px; display: none; }
+  .pipeline.active { display: block; }
+  .pipeline__step { display: flex; align-items: flex-start; gap: 14px; padding: 12px 0; opacity: .25; transition: opacity .4s; }
+  .pipeline__step.active { opacity: 1; }
+  .pipeline__step.done { opacity: .6; }
+  .pipeline__icon {
+    width: 28px; height: 28px; border-radius: 8px; display: flex; align-items: center; justify-content: center;
+    font-size: 13px; flex-shrink: 0; background: var(--surface2); border: 1px solid var(--border); color: var(--text-dim);
+    transition: background .3s, border-color .3s, color .3s;
+  }
+  .pipeline__step.active .pipeline__icon { background: var(--accent-glow); border-color: var(--accent); color: var(--accent); animation: icon-pulse 1.5s ease-in-out infinite; }
+  @keyframes icon-pulse { 0%,100% { box-shadow: 0 0 0 0 var(--accent-glow); } 50% { box-shadow: 0 0 0 6px transparent; } }
+  .pipeline__step.done .pipeline__icon { background: var(--green-glow); border-color: var(--green); color: var(--green); animation: none; }
+  .pipeline__label { font-size: 14px; font-weight: 500; line-height: 1.4; }
+  .pipeline__detail { font-family: var(--mono); font-size: 11px; color: var(--text-dim); margin-top: 2px; }
+
+  .result { margin: 48px 0 80px; display: none; animation: result-in .6s cubic-bezier(.16,1,.3,1) both; }
+  .result.active { display: block; }
+  @keyframes result-in { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: none; } }
+  .result__header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; flex-wrap: wrap; gap: 12px; }
+  .result__company { font-size: clamp(24px, 4vw, 36px); font-weight: 700; letter-spacing: -1px; }
+  .result__tier {
+    font-family: var(--mono); font-size: 12px; letter-spacing: 1.5px; text-transform: uppercase;
+    padding: 6px 14px; border-radius: 8px; background: var(--accent-glow); color: var(--accent); border: 1px solid rgba(232,93,117,.15);
+  }
+
+  .result__grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-bottom: 20px; }
+  .stat { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 18px; animation: stat-in .5s cubic-bezier(.16,1,.3,1) both; }
+  .stat:nth-child(1) { animation-delay: .1s; }
+  .stat:nth-child(2) { animation-delay: .2s; }
+  .stat:nth-child(3) { animation-delay: .3s; }
+  .stat:nth-child(4) { animation-delay: .4s; }
+  @keyframes stat-in { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
+  .stat__label { font-family: var(--mono); font-size: 10px; letter-spacing: 2px; text-transform: uppercase; color: var(--text-dim); margin-bottom: 6px; }
+  .stat__value { font-size: 22px; font-weight: 700; letter-spacing: -.5px; }
+  .stat__value--accent { color: var(--accent); }
+  .stat__value--green { color: var(--green); }
+  .stat__value--amber { color: var(--amber); }
+  .stat__value--blue { color: var(--blue); }
+
+  .contacts { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; margin-bottom: 20px; }
+  .contact {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px;
+    display: flex; align-items: center; gap: 12px; animation: stat-in .5s cubic-bezier(.16,1,.3,1) both;
+  }
+  .contact:nth-child(1) { animation-delay: .5s; }
+  .contact:nth-child(2) { animation-delay: .6s; }
+  .contact:nth-child(3) { animation-delay: .7s; }
+  .contact__avatar {
+    width: 36px; height: 36px; border-radius: 10px; background: var(--surface3);
+    display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700;
+    color: var(--accent); flex-shrink: 0;
+  }
+  .contact__name { font-size: 14px; font-weight: 600; }
+  .contact__title { font-size: 12px; color: var(--text-dim); }
+
+  .brief { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; animation: stat-in .5s cubic-bezier(.16,1,.3,1) .8s both; }
+  .brief__label {
+    display: flex; align-items: center; gap: 8px;
+    font-family: var(--mono); font-size: 10px; letter-spacing: 2px; text-transform: uppercase; color: var(--accent); margin-bottom: 12px;
+  }
+  .brief__label::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); opacity: .6; }
+  .brief__text { font-size: 14px; line-height: 1.75; color: var(--text-dim); white-space: pre-wrap; }
+
+  .error { margin-top: 20px; padding: 16px 20px; background: var(--surface); border: 1px solid rgba(248,113,113,.2); border-radius: 12px; color: #f87171; font-family: var(--mono); font-size: 13px; display: none; }
+  .error.active { display: block; }
+
+  .footer { text-align: center; padding: 40px 0; font-family: var(--mono); font-size: 11px; color: var(--text-muted); letter-spacing: 1px; }
+  .footer a { color: var(--text-dim); text-decoration: none; }
+  .footer a:hover { color: var(--accent); }
+
+  @media (max-width: 600px) {
+    .header { padding-top: 32px; }
+    .result__grid { grid-template-columns: 1fr 1fr; }
+    .contacts { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <header class="header">
+    <div class="header__badge">Live Enrichment Engine</div>
+    <h1 class="header__title">Prospect Intelligence</h1>
+    <p class="header__sub">Type a company name. Get a full dossier in 10 seconds.<br/>Apollo.io data, AI-generated brief, written to HubSpot.</p>
+  </header>
+
+  <div class="input-section">
+    <div class="input-wrap">
+      <input type="text" class="input-field" id="companyInput" placeholder="Enter company name..." autocomplete="off" />
+      <button class="input-btn" id="enrichBtn" onclick="startEnrichment()">Enrich</button>
+    </div>
+    <p class="input-hint">Try: Culver's, Discount Tire, BetRivers, D.R. Horton</p>
+  </div>
+
+  <div class="pipeline" id="pipeline">
+    <div class="pipeline__step" id="step1">
+      <div class="pipeline__icon">1</div>
+      <div><div class="pipeline__label">HubSpot</div><div class="pipeline__detail" id="step1-detail">Creating company record...</div></div>
+    </div>
+    <div class="pipeline__step" id="step2">
+      <div class="pipeline__icon">2</div>
+      <div><div class="pipeline__label">Apollo.io</div><div class="pipeline__detail" id="step2-detail">Enriching company data...</div></div>
+    </div>
+    <div class="pipeline__step" id="step3">
+      <div class="pipeline__icon">3</div>
+      <div><div class="pipeline__label">Claude AI</div><div class="pipeline__detail" id="step3-detail">Generating prospect brief...</div></div>
+    </div>
+    <div class="pipeline__step" id="step4">
+      <div class="pipeline__icon">4</div>
+      <div><div class="pipeline__label">Writeback</div><div class="pipeline__detail" id="step4-detail">Updating HubSpot record...</div></div>
+    </div>
+  </div>
+
+  <div class="error" id="error"></div>
+
+  <div class="result" id="result">
+    <div class="result__header">
+      <h2 class="result__company" id="resultName"></h2>
+      <div class="result__tier" id="resultTier"></div>
+    </div>
+    <div class="result__grid" id="resultGrid"></div>
+    <div class="contacts" id="resultContacts"></div>
+    <div class="brief">
+      <div class="brief__label">AI Prospect Brief</div>
+      <div class="brief__text" id="resultBrief"></div>
+    </div>
+  </div>
+
+  <footer class="footer">
+    Cast Iron Media &nbsp;&middot;&nbsp; The Foundry &nbsp;&middot;&nbsp;
+    <a href="https://github.com/cjf-iii/hubspot-integration" target="_blank">github.com/cjf-iii/hubspot-integration</a>
+  </footer>
+</div>
+
+<script>
+/**
+ * Enrichment UI — connects to the FastAPI SSE endpoint and builds
+ * the result panel using safe DOM methods (no innerHTML with external data).
+ *
+ * All external data (company names, contact names, titles from Apollo)
+ * is rendered via textContent to prevent XSS from untrusted API responses.
+ */
+
+var enrichmentData = {};
+
+/**
+ * Safely escapes a string for display — used only for known-safe
+ * template structures, never for external data injection.
+ */
+function safeText(str) {
+  return str == null ? '' : String(str);
+}
+
+/**
+ * Creates a DOM element with optional class and text content.
+ * Uses textContent exclusively — no innerHTML with external data.
+ */
+function el(tag, className, text) {
+  var node = document.createElement(tag);
+  if (className) node.className = className;
+  if (text != null) node.textContent = safeText(text);
+  return node;
+}
+
+function startEnrichment() {
+  var input = document.getElementById('companyInput');
+  var name = input.value.trim();
+  if (!name) return;
+
+  var btn = document.getElementById('enrichBtn');
+  btn.disabled = true;
+  btn.textContent = 'Working...';
+
+  document.getElementById('pipeline').classList.add('active');
+  document.getElementById('result').classList.remove('active');
+  document.getElementById('error').classList.remove('active');
+  enrichmentData = {};
+
+  for (var i = 1; i <= 4; i++) {
+    var step = document.getElementById('step' + i);
+    step.classList.remove('active', 'done');
+  }
+
+  /* Connect to SSE endpoint — streams pipeline progress in real time */
+  var es = new EventSource('/api/enrich?name=' + encodeURIComponent(name));
+
+  /* Pipeline step handler — updates visual indicators as each step progresses */
+  es.addEventListener('step', function(e) {
+    var data = JSON.parse(e.data);
+    var stepEl = document.getElementById('step' + data.step);
+    var detailEl = document.getElementById('step' + data.step + '-detail');
+
+    if (data.status === 'active') {
+      stepEl.classList.add('active');
+      stepEl.classList.remove('done');
+    } else if (data.status === 'done') {
+      stepEl.classList.remove('active');
+      stepEl.classList.add('done');
+    }
+
+    /* Detail labels come from our own server, not external input */
+    detailEl.textContent = data.label;
+
+    if (data.data) {
+      Object.assign(enrichmentData, data.data);
+    }
+  });
+
+  /* Final result handler — builds result panel with safe DOM methods */
+  es.addEventListener('result', function(e) {
+    var data = JSON.parse(e.data);
+    es.close();
+    btn.disabled = false;
+    btn.textContent = 'Enrich';
+    showResult(data);
+  });
+
+  /* Error handler */
+  es.addEventListener('error', function(e) {
+    if (e.data) {
+      var data = JSON.parse(e.data);
+      var errEl = document.getElementById('error');
+      errEl.textContent = data.message;
+      errEl.classList.add('active');
+    }
+    es.close();
+    btn.disabled = false;
+    btn.textContent = 'Enrich';
+  });
+}
+
+function showResult(data) {
+  document.getElementById('result').classList.add('active');
+
+  /* Company name — rendered via textContent (safe for external data) */
+  document.getElementById('resultName').textContent = safeText(data.company_name);
+
+  /* Tier badge — maps tier number to descriptive label */
+  var tierLabels = { '1': 'Tier 1 — Cross-Regional', '2': 'Tier 2 — Regional', '3': 'Tier 3 — DMA-Specific', '4': 'Tier 4 — Growth' };
+  document.getElementById('resultTier').textContent = tierLabels[data.tier] || ('Tier ' + data.tier);
+
+  /* Stats grid — built with safe DOM construction, no innerHTML */
+  var grid = document.getElementById('resultGrid');
+  grid.replaceChildren();
+
+  var stats = [
+    { label: 'Vertical', value: safeText(data.vertical), cls: 'accent' },
+    { label: 'Est. Ad Spend', value: data.revenue ? ('$' + Number(data.revenue).toLocaleString()) : 'Unknown', cls: 'green' },
+    { label: 'Contacts Added', value: data.contacts_created + ' decision makers', cls: 'blue' },
+    { label: 'AI Brief', value: 'Generated', cls: 'amber' },
+  ];
+
+  stats.forEach(function(s) {
+    var card = el('div', 'stat');
+    card.appendChild(el('div', 'stat__label', s.label));
+    card.appendChild(el('div', 'stat__value stat__value--' + s.cls, s.value));
+    grid.appendChild(card);
+  });
+
+  /* Contact cards — all external data rendered via textContent */
+  var contactsEl = document.getElementById('resultContacts');
+  contactsEl.replaceChildren();
+
+  if (enrichmentData.contacts && enrichmentData.contacts.length > 0) {
+    enrichmentData.contacts.forEach(function(c) {
+      var card = el('div', 'contact');
+
+      /* Avatar with initials — derived from contact name */
+      var contactName = safeText(c.name);
+      var initials = contactName.split(' ').map(function(w) { return w[0] || ''; }).join('').toUpperCase().substring(0, 2);
+      card.appendChild(el('div', 'contact__avatar', initials));
+
+      /* Name and title container */
+      var info = el('div');
+      info.appendChild(el('div', 'contact__name', contactName));
+      info.appendChild(el('div', 'contact__title', safeText(c.title)));
+      card.appendChild(info);
+
+      contactsEl.appendChild(card);
+    });
+  }
+
+  /* AI brief — plain text via textContent */
+  document.getElementById('resultBrief').textContent = safeText(data.brief);
+}
+
+/* Enter key triggers enrichment */
+document.getElementById('companyInput').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') startEnrichment();
+});
+</script>
+
+</body>
+</html>

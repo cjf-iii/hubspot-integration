@@ -14,6 +14,9 @@ Provides three top-level commands:
                 full enrichment pipeline, and displays formatted results.
                 Designed for first-run validation and sales demos.
 
+  cim serve   — Launches the web UI on localhost:8000. Open the browser,
+                type a company name, watch enrichment happen in real time.
+
 All commands load API keys from the environment via load_config(), which reads
 a .env file if present. Missing keys produce a clear error before any API calls
 are attempted.
@@ -379,3 +382,31 @@ def demo(company_name: str) -> None:
         finally:
             # Always close Apollo client — HubSpotClient is closed by 'with' block
             apollo.close()
+
+
+# ---------------------------------------------------------------------------
+# serve command — web UI
+# ---------------------------------------------------------------------------
+
+@cli.command()
+@click.option("--port", default=8000, help="Port to serve on (default: 8000)")
+@click.option("--host", default="127.0.0.1", help="Host to bind to (default: 127.0.0.1)")
+def serve(port: int, host: str) -> None:
+    """Launch the web UI for interactive enrichment.
+
+    Opens a browser-based interface where you can type a company name
+    and watch the enrichment pipeline run in real time with SSE progress.
+
+    Requires: pip install uvicorn fastapi
+    """
+    try:
+        import uvicorn
+    except ImportError:
+        click.echo("Error: uvicorn and fastapi are required for the web UI.")
+        click.echo("Install them: pip install uvicorn fastapi")
+        raise SystemExit(1)
+
+    click.echo(f"\n  CIM Enrichment UI starting on http://{host}:{port}")
+    click.echo("  Press Ctrl+C to stop.\n")
+
+    uvicorn.run("cim.server:app", host=host, port=port, log_level="warning")
